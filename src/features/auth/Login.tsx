@@ -1,8 +1,9 @@
 import { useState, type SubmitEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
 import { clearAuthError } from '../../app/auth/authSlice';
 import { loginUser } from '../../app/auth/authThunks';
+import AmazonLogo from '../../assets/Amazon-Logo.png';
 import AuthInput from './components/AuthInput';
 import AuthButton from './components/AuthButton';
 import AuthLink from './components/AuthLink';
@@ -10,7 +11,7 @@ import AuthLink from './components/AuthLink';
 export default function LoginPage() {
   const dispatch = useAppDispatch();
   const location = useLocation();
-  const { authToken, status, error: serverError } = useAppSelector((s) => s.auth);
+  const { sessionStatus, status, error: serverError } = useAppSelector((s) => s.auth);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -21,8 +22,10 @@ export default function LoginPage() {
   const errorMessage = validationError || serverError;
 
   // Where to go after login (set by ProtectedRoute), default "/"
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
-  if (authToken) return <Navigate to={from} replace />;
+  const from =
+    (location.state as { from?: { pathname: string } } | null)?.from?.pathname ??
+    '/products';
+  if (sessionStatus === 'authenticated') return <Navigate to={from} replace />;
 
   const resetErrors = () => {
     if (validationError) setValidationError('');
@@ -42,18 +45,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-white text-[#0f1111] font-[Arial,Helvetica,sans-serif] text-[13px] leading-[19px] flex flex-col items-center">
       <header className="pt-[14px] pb-[18px]">
-        <a
-          href="/"
+        <Link
+          to="/products"
           aria-label="Home"
-          className="relative inline-block text-[34px] font-bold tracking-[-1.5px] text-[#111] no-underline hover:no-underline hover:text-[#111]"
+          className="inline-block no-underline hover:no-underline"
         >
-          amazon
-          <span className="ml-px text-[15px] font-normal tracking-normal">.com</span>
-          <span
-            aria-hidden="true"
-            className="absolute left-2 bottom-0.5 w-[52px] h-2 border-b-[3px] border-[#f90] rounded-b-[40px]"
-          />
-        </a>
+          <img src={AmazonLogo} alt="Amazon" className="h-14 w-auto" />
+        </Link>
       </header>
 
       <main className="w-[350px] max-w-[calc(100%-32px)]">
@@ -136,9 +134,9 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* DEMO ONLY: remove before shipping */}
-        <p className="mb-[22px] px-3 py-2 text-xs text-[#565959] bg-[#f6f6f6] rounded">
-          Demo login: <b>emilys</b> / <b>emilyspass</b>
+        {/* Demo credentials belong to DummyJSON, not to Amazon. */}
+        <p className="mb-[22px] rounded bg-[#f6f6f6] px-3 py-2 text-xs text-[#565959]">
+          Demo only — not an Amazon sign-in page. Use <b>emilys</b> / <b>emilyspass</b>.
         </p>
 
         <div className="relative text-center mb-[14px] leading-none">

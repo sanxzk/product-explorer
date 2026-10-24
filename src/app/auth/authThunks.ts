@@ -1,60 +1,75 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { getCurrentUser, login } from '../../api/authApi';
+import { clearAuthToken, readAuthToken, saveAuthToken } from './authCookie';
 import type { LoginCredentials, LoginResult } from '../../types/Auth';
 import type { User } from '../../types/User';
 
-// Minimal state shape, so this file doesn't import the store/slice (avoids a cycle)
-type AuthRoot = { auth: { authToken: string | null; userStatus: string } };
+interface AuthRootState {
+  auth: {
+    authToken: string | null;
+    sessionStatus: string;
+  };
+}
 
-const getErrorMessage = (err: unknown, fallback: string): string => {
-  if (axios.isAxiosError(err)) {
-    // dummyjson answers { message: "Invalid credentials" } etc.
-    return (err.response?.data as { message?: string } | undefined)?.message ?? fallback;
-  }
-  return fallback;
-};
-
-export const loginUser = createAsyncThunk<
-  LoginResult,
-  LoginCredentials,
-  { rejectValue: string }
->('auth/login', async (credentials, { rejectWithValue }) => {
-  try {
-    return await login(credentials);
-  } catch (err) {
-    return rejectWithValue(getErrorMessage(err, 'Unable to sign in. Please try again.'));
-  }
-});
-
-export interface FetchUserError {
+interface RestoreSessionError {
   message: string;
-  /** true when the token is missing/expired/invalid, so the session must end */
   unauthorized: boolean;
 }
 
-export const fetchCurrentUser = createAsyncThunk<
-  User,
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError(err)) {
+    const message = (err.response?.data as { message?: unknown } | undefined)?.message;
+    return typeof message === 'string' ? message : fallback;
+  }
+  return err instanceof Error ? err.message : fallback;
+};
+
+export const loginUser = createAsyncThunk<LoginResult, LoginCredentials, { rejectValue: string }>(
+  'auth/login',
+  async (credentials, { rejectWithValue }) => {
+    try {
+      const result = await login(credentials);
+      saveAuthToken(result.authToken);
+      return result;
+    } catch (err) {
+      return rejectWithValue(getErrorMessage(err, 'Unable to sign in. Please try again.'));
+    }
+  }
+);
+
+export const restoreSession = createAsyncThunk<
+  { user: User; authToken: string },
   void,
-  { rejectValue: FetchUserError }
+  { state: AuthRootState; rejectValue: RestoreSessionError }
 >(
-  'auth/fetchCurrentUser',
+  'auth/restoreSession',
   async (_, { getState, rejectWithValue }) => {
-    const token = (getState() as AuthRoot).auth.authToken;
-    if (!token) return rejectWithValue({ message: 'Not signed in', unauthorized: true });
+    const authToken = getState().auth.authToken ?? readAuthToken();
+    if (!authToken) {
+      clearAuthToken();
+      return rejectWithValue({ message: 'No saved session.', unauthorized: true });
+    }
 
     try {
-      return await getCurrentUser(token);
+      const user = await getCurrentUser(authToken);
+      return { user, authToken };
     } catch (err) {
-      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const unauthorized =
+        axios.isAxiosError(err) && [401, 403].includes(err.response?.status ?? 0);
+      if (unauthorized) clearAuthToken();
       return rejectWithValue({
-        message: getErrorMessage(err, 'Unable to load your account.'),
-        unauthorized: status === 401 || status === 403,
+        message: getErrorMessage(err, 'Unable to restore your session.'),
+        unauthorized,
       });
     }
   },
   {
-    // Skip if a request is already running (e.g. React StrictMode double effects)
-    condition: (_, { getState }) => (getState() as AuthRoot).auth.userStatus !== 'loading',
+    condition: (_, { getState }) =>
+      getState().auth.sessionStatus === 'idle',
   }
 );
+
+export const logoutUser = createAsyncThunk<void>('auth/logout', async () => {
+  clearAuthToken();
+});

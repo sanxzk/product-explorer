@@ -1,51 +1,40 @@
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from './app/hooks';
-import { fetchCurrentUser } from './app/auth/authThunks';
+import { useAppDispatch, useAppSelector } from './hooks/hooks';
+import { retrySession } from './app/auth/authSlice';
 
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
   const location = useLocation();
-  const { authToken, user, userStatus } = useAppSelector((s) => s.auth);
+  const { user, sessionStatus } = useAppSelector((s) => s.auth);
 
-  // Token came back from the cookie after a refresh, but we don't have the user yet
-  useEffect(() => {
-    if (authToken && !user && userStatus === 'idle') {
-      dispatch(fetchCurrentUser());
-    }
-  }, [authToken, user, userStatus, dispatch]);
-
-  if (!authToken) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+  if (sessionStatus === 'idle' || sessionStatus === 'loading') {
+    return (
+      <main className="grid min-h-screen place-items-center bg-slate-50">
+        <p role="status" className="text-slate-600">Checking your session…</p>
+      </main>
+    );
   }
 
-  if (!user) {
-    if (userStatus === 'failed') {
-      // Network/server error (an expired token would already have logged us out)
-      return (
-        <div className="min-h-screen grid place-items-center text-[13px] text-[#0f1111]">
-          <div className="text-center">
-            <p className="mb-3">We couldn't load your account.</p>
-            <button
-              type="button"
-              onClick={() => dispatch(fetchCurrentUser())}
-              className="px-4 h-[31px] rounded-[3px] border border-[#adb1b8] bg-[linear-gradient(to_bottom,#f7f8fa,#e7e9ec)]"
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      );
-    }
+  if (sessionStatus === 'failed') {
     return (
-      <div className="min-h-screen grid place-items-center">
-        <div
-          role="status"
-          aria-label="Loading"
-          className="h-8 w-8 animate-spin rounded-full border-2 border-[#ddd] border-t-[#e77600]"
-        />
-      </div>
+      <main className="grid min-h-screen place-items-center bg-slate-50 px-4">
+        <div className="text-center">
+          <p className="text-slate-700">Unable to validate your saved session.</p>
+          <button
+            type="button"
+            onClick={() => dispatch(retrySession())}
+            className="mt-3 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </main>
     );
+  }
+
+  if (sessionStatus !== 'authenticated' || !user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   return <>{children}</>;
