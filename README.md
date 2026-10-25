@@ -213,16 +213,3 @@ npm run lint
 
 Both commands currently pass successfully.
 
-## Summary
-
-This is a complete demo product browsing application that combines:
-
-- login and session validation
-- product catalog browsing
-- sophisticated filtering and pagination
-- protected pages
-- Redux-based state management
-- backend API integration with DummyJSON
-- AWS deployment support
-
-It is intentionally easy to understand and well-suited as an assessment/demo project.
