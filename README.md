@@ -1,52 +1,228 @@
 # Product Explorer
 
-A React, TypeScript, and Vite product explorer with product search, filters, pagination, and product detail pages.
+This project is a React + TypeScript product browsing app inspired by Amazon-style shopping pages. It lets users sign in, browse products, filter by category/brand/price, search products, view product details, and keep their last-used filters saved in the browser.
 
-## Getting started
+The app uses DummyJSON as its backend API and is designed for demo use.
 
-```sh
+## Live Link
+Access the hosted application using the custom domain configured through AWS and GoDaddy:
+
+https://leegality-assessment.sanjana-cloud.in/
+
+## What this app does
+
+- User login screen with Amazon-inspired design
+- Protected routes for products and product detail pages
+- Product listing with:
+  - search
+  - category filter
+  - brand filter
+  - price range filter
+  - pagination
+- Product detail page with image gallery, product description, reviews, and pricing
+- Session restore using saved auth token
+- Redux Persist storing product filter preferences in browser storage
+- AWS deployment setup with CloudFront + custom domain
+
+## Tech stack
+
+- React 19
+- TypeScript
+- Vite
+- Redux Toolkit
+- Redux Persist
+- React Router
+- Axios
+- Tailwind CSS
+- DummyJSON API
+
+## Demo login credentials
+
+Use these credentials when testing the sign-in flow:
+
+- Username: `emilys`
+- Password: `emilyspass`
+
+Important: this login screen is an Amazon-inspired UI only. It is not an actual Amazon authentication system. The credentials are demo credentials for DummyJSON.
+
+## Project setup
+
+1. Open the project folder.
+2. Install dependencies:
+
+```bash
 npm install
+```
+
+3. Create a `.env` file in the project root if needed.
+
+```bash
+VITE_API_BASE_URL=https://dummyjson.com
+```
+
+4. Start the app:
+
+```bash
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` in a local `.env` file to point API requests at the backend. If it is unset, requests use the current origin.
+5. Open the local Vite URL in the browser.
 
-## Persistence and authentication
+### Production build
 
-Only product filters and listing preferences are persisted in browser local storage through Redux Persist. The app waits for those preferences to rehydrate before rendering, and validates stored values when migrating them.
+```bash
+npm run build
+```
 
-After login, the app stores DummyJSON's access token in a JavaScript-readable `authToken` cookie for two hours. On app startup it reads the cookie and validates the token with `GET /auth/me`; invalid sessions clear the cookie and return the user to sign-in. Signing out clears the cookie. DummyJSON receives a two-hour token lifetime request through `expiresInMins: 120`.
+### Linting
 
-**Security note:** a JavaScript-readable cookie is not `HttpOnly` and can be stolen by injected scripts (XSS). This is demo-only behavior, not suitable for production authentication. Production should use a backend-managed `HttpOnly; Secure; SameSite` session cookie instead. The Amazon-inspired login is not an Amazon sign-in service; use demo credentials only and never enter a real Amazon password.
+```bash
+npm run lint
+```
 
-## Assumptions and architecture
+## How the app works
 
-- The product API is DummyJSON. Its API does not support combining price and brand filters server-side, so filtered results are fetched and filtered in the browser before pagination.
-- Product list filters live in Redux so the listing can be revisited without losing the selected values; only those filter preferences are persisted.
-- Product detail data is fetched by ID when `/product/:id` opens. The Back to products link returns to the listing, where Redux retains the active filters and page.
-- Search and price entry are debounced to avoid issuing a network request for every keystroke. Category and brand choices update the results immediately.
-- Protected routes restore sessions through the backend's `/auth/me` endpoint. With DummyJSON only, refresh sign-in cannot persist because it does not issue the required HttpOnly cookie.
+### 1. Login flow
 
-## Possible improvements
+- The app opens on a login page.
+- The user enters a username and password.
+- The frontend sends a request to DummyJSON:
+  - `POST /auth/login`
+- On success, the API returns an `accessToken` and user data.
+- The token is stored in a browser cookie named `authToken`.
+- The user is redirected to the product listing page.
 
-- Add a backend implementing the documented two-hour HttpOnly session cookie and session endpoints.
-- Add automated reducer, API, and route tests, including combined filters, pagination reset, and browser refresh behavior.
-- Cache product and category API responses and add retry/rate-limit behavior for transient failures.
+### 2. Session restore
 
-## Source layout
+On app startup, the app reads the saved token from the cookie.
 
-- `src/app/` - Redux store, typed hooks, auth state/thunks, and filter persistence
-- `src/api/` - shared Axios client and authentication API calls
-- `src/features/auth/` - sign-in page and reusable form components
-- `src/features/product-listing/` - product listing page
-- `src/features/product-detail/` - product details page at `/product/:id`
-- `src/components/` - shared product, filter, and navigation UI
-- `src/routes.tsx` - application routes
-- `src/types/` - shared TypeScript models
+- If a valid token exists, it calls:
+  - `GET /auth/me`
+- If the token is valid, the user stays logged in.
+- If the token is invalid/expired, the app clears the cookie and sends the user back to the login page.
 
-## Checks
+This is handled by the Redux auth slice and thunks.
 
-```sh
+### 3. Protected routes
+
+Routes such as `/products` and `/product/:id` are protected:
+
+- If the user is not authenticated, they are redirected to `/login`.
+- If the session is being checked, the app shows a loading state.
+- If validation fails, it gives the user the option to retry.
+
+### 4. Product listing
+
+The product listing page:
+
+- loads categories once
+- loads brand options based on current category
+- fetches products based on filters
+- supports search and pagination
+- shows a loading state and a no-results message if no products match
+
+### 5. Filters and search
+
+The app stores filter data in Redux and saves selected filter values with Redux Persist.
+
+The following values are persisted:
+
+- query
+- category
+- minPrice
+- maxPrice
+- brands
+- page
+- sidebarOpen
+
+This means when the user comes back to the product listing, the previous page and filter choices are kept.
+
+### 6. Product detail page
+
+When the user clicks a product, the app loads the product by ID using:
+
+- `GET /products/:id`
+
+The detail page displays:
+
+- main product image
+- image gallery
+- product title and price
+- rating
+- brand and category
+- description
+- warranty and shipping information
+- customer reviews
+
+## API usage
+
+The project uses DummyJSON endpoints. The main ones are:
+
+- `POST /auth/login` — login with username/password
+- `GET /auth/me` — validate the current user with the saved token
+- `GET /products` — get product list
+- `GET /products/search` — search products by keyword
+- `GET /products/category/:category` — list products in a category
+- `GET /products/categories` — get all product categories
+- `GET /products/:id` — get a single product by ID
+
+## Important technical notes from the project
+
+These notes explain how the app works and why some decisions were made:
+
+- The DummyJSON API does not support combining price and brand filters on the server-side.
+- Because of that, when a price filter or brand filter is used, the app fetches a broader set of products and then applies filtering in the browser before pagination.
+- Search and price input are debounced so the app does not call the API on every key press.
+- Category and brand filtering update the list immediately.
+- Product list filters are kept in Redux so they are not lost when leaving and returning to the listing page.
+- The app saves only the filter state, not the entire product data, using Redux Persist.
+- Protected routes restore session state through `/auth/me`.
+- DummyJSON does not issue a secure HttpOnly cookie, so this app uses a JavaScript-readable cookie for demo purposes only.
+
+
+## Project structure
+
+- `src/app/` — Redux store, auth state, filter state, product state, and thunk logic
+- `src/api/` — shared Axios client and authentication API functions
+- `src/features/auth/` — login screen and auth UI components
+- `src/features/product-listing/` — main product list page
+- `src/features/product-detail/` — product detail page
+- `src/components/` — shared UI components like Navbar, filters, product cards, and pagination
+- `src/routes.tsx` — route definitions
+- `src/types/` — TypeScript models for products, auth, and users
+- `src/hooks/` — shared hooks like debounced value handling
+
+## AWS and custom domain notes
+
+This project was also set up for deployment on AWS.
+
+- CI/CD was configured using GitHub Actions and AWS IAM
+- The frontend was hosted using S3 and CloudFront
+- A custom domain is connected to the deployment:
+  - https://leegality-assessment.sanjana-cloud.in/
+
+
+## Validation
+
+The project was checked with:
+
+```bash
 npm run build
 npm run lint
 ```
+
+Both commands currently pass successfully.
+
+## Summary
+
+This is a complete demo product browsing application that combines:
+
+- login and session validation
+- product catalog browsing
+- sophisticated filtering and pagination
+- protected pages
+- Redux-based state management
+- backend API integration with DummyJSON
+- AWS deployment support
+
+It is intentionally easy to understand and well-suited as an assessment/demo project.
