@@ -136,7 +136,7 @@ export default function LoginPage() {
 
         {/* Demo credentials belong to DummyJSON, not to Amazon. */}
         <p className="mb-[22px] rounded bg-[#f6f6f6] px-3 py-2 text-xs text-[#565959]">
-          Demo only — not an Amazon sign-in page. Use <b>emilys</b> / <b>emilyspass</b>.
+          Use these credentials: <b>emilys</b> / <b>emilyspass</b>.
         </p>
 
         <div className="relative text-center mb-[14px] leading-none">
